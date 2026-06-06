@@ -7,6 +7,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\graphicspath{{figures/}}
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{hyperref}
@@ -19,16 +20,16 @@
 
 % ---- headline numbers (single source of truth; reproduced by the code under data/outputs/<run_id>/) ----
 \newcommand{\reconResid}{4.4\times10^{-16}}
-\newcommand{\icBase}{0.017}
-\newcommand{\icHGB}{0.023}
+\newcommand{\icBase}{0.016}
+\newcommand{\icHGB}{0.024}
 \newcommand{\icEns}{0.022}
-\newcommand{\icEnsT}{7.1}
+\newcommand{\icEnsT}{7.2}
 \newcommand{\spreadEns}{4.6}
-\newcommand{\grossSharpeBench}{1.78}
-\newcommand{\netSmall}{0.25}
-\newcommand{\netBench}{0.39}
-\newcommand{\netLarge}{0.37}
-\newcommand{\posYears}{7/10}
+\newcommand{\grossSharpeBench}{1.73}
+\newcommand{\netSmall}{0.23}
+\newcommand{\netBench}{0.38}
+\newcommand{\netLarge}{0.58}
+\newcommand{\posYears}{8/10}
 
 \title{\textbf{C2O --- Close-to-Open}\\[2pt]
 \large A cross-sectional, dollar-neutral overnight long/short strategy on US large-cap equities}
@@ -181,11 +182,29 @@ scored on an \emph{AUM-agnostic} signal universe (base-\code{OK} at the most per
 identical signal is evaluated honestly at all three AUMs, with capacity applied only in Step~5.
 
 \paragraph{Q5.3 (IC and stability).} Out-of-sample 2015--2024: ridge mean IC $\approx\icBase$, HGB
-$\approx\icHGB$ ($t\approx7.9$), ensemble $\approx\icEns$ ($t\approx\icEnsT$, positive on $\approx58\%$ of
+$\approx\icHGB$ ($t\approx8.2$), ensemble $\approx\icEns$ ($t\approx\icEnsT$, positive on $\approx58\%$ of
 days), lifting the decile long/short spread from $\approx3.6$ to $\approx\spreadEns$\,bps and the gross
 pre-cost L/S Sharpe from $\approx1.1$ to $\approx1.6$. IC is positive every year (Table
 \code{step4b\_ic\_by\_year}); it is strongest 2015--2018 and weakest 2022--2023 (crowded-reversal and
 one-directional-momentum regimes).
+
+\begin{table}[h]\centering\small
+\caption{Out-of-sample ensemble IC by year (daily cross-sectional Spearman). Positive every year; strongest
+2015--2017, weakest 2022--2023 (crowded-reversal / one-directional-momentum regimes).}\label{tab:icyear}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+year & 2015 & 2016 & 2017 & 2018 & 2019 & 2020 & 2021 & 2022 & 2023 & 2024\\
+\midrule
+mean IC & 0.041 & 0.030 & 0.039 & 0.026 & 0.027 & 0.020 & 0.015 & 0.002 & 0.004 & 0.007\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.86\textwidth]{ensemble_rolling_ic.png}
+\caption{63-day rolling mean IC of the ensemble alpha (OOS 2015--2024, signal universe = base-\code{OK} at the
+most permissive AUM). The edge is persistent and predominantly positive; it weakens in 2022--2023.}
+\end{figure}
 
 \paragraph{Q5.4 (ablation).} The non-linear learner is the source of the gain: removing it (ridge only)
 returns IC to the $\approx\icBase$ baseline. The ensemble does not collapse when any single feature group is
@@ -230,10 +249,10 @@ book concentrates.}\label{tab:sweep}
 \toprule
 top/bottom & gross Sharpe & \textbf{net Sharpe} & net ann.\ \% & max DD \% & gross util.\\
 \midrule
-10\% (decile) & 1.53 & $-1.01$ & $-4.1$ & $-34.9$ & 1.00\\
-5\%          & 1.51 & $-0.49$ & $-2.5$ & $-24.4$ & 0.99\\
-3\%          & 1.65 & $+0.03$ & $+0.2$ & $-13.7$ & 0.84\\
-\textbf{2\% (headline)} & \textbf{1.78} & $\mathbf{+0.39}$ & $\mathbf{+1.9}$ & $-7.2$ & 0.65\\
+10\% (decile) & 1.54 & $-1.00$ & $-4.1$ & $-34.8$ & 1.00\\
+5\%          & 1.60 & $-0.42$ & $-2.1$ & $-21.4$ & 0.99\\
+3\%          & 1.58 & $-0.05$ & $-0.3$ & $-15.5$ & 0.84\\
+\textbf{2\% (headline)} & \textbf{1.73} & $\mathbf{+0.38}$ & $\mathbf{+1.9}$ & $-6.9$ & 0.65\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -246,31 +265,56 @@ shorts excluded, $5\%$ ADV participation cap, Section~6.3 cost schedule, OOS 201
 \toprule
 AUM & net ann.\ & net vol & \textbf{net Sharpe} & gross Sharpe & max DD & daily turn. & gross util.\\
 \midrule
-\$50M  & $+1.5\%$ & $6.0\%$ & $\mathbf{+\netSmall}$ & 1.86 & $-12.8\%$ & 0.93 & 0.93\\
-\$250M & $+1.9\%$ & $4.8\%$ & $\mathbf{+\netBench}$ & 1.78 & $-7.2\%$  & 0.65 & 0.65\\
-\$1B   & $+0.8\%$ & $2.3\%$ & $\mathbf{+\netLarge}$ & 1.40 & $-4.5\%$  & 0.23 & 0.23\\
+\$50M  & $+1.4\%$ & $6.1\%$ & $\mathbf{+\netSmall}$ & 1.82 & $-10.6\%$ & 0.93 & 0.93\\
+\$250M & $+1.9\%$ & $5.0\%$ & $\mathbf{+\netBench}$ & 1.73 & $-6.9\%$  & 0.65 & 0.65\\
+\$1B   & $+1.2\%$ & $2.0\%$ & $\mathbf{+\netLarge}$ & 1.68 & $-3.2\%$  & 0.22 & 0.22\\
 \bottomrule
 \end{tabular}
 \end{table}
 \noindent As AUM rises the $2\%$ book cannot absorb the capital under the $5\%$ ADV cap, so gross utilisation
-falls ($0.93\!\to\!0.65\!\to\!0.23$) while every position is pinned at the $5\%$ cap; Sharpe is preserved
-because cost scales with deployed gross. This is the capacity story made explicit.
+falls ($0.93\!\to\!0.65\!\to\!0.22$) while every position is pinned at the $5\%$ cap. Risk-adjusted performance
+is \emph{not} degraded by scale --- net Sharpe actually rises to $+\netLarge$ at \$1B --- because the binding
+cap forces the book into the most liquid, lowest-volatility extreme names (net volatility falls
+$6.1\%\!\to\!2.0\%$). The price of scale is paid in deployed capital and absolute return, not in Sharpe; this
+is the capacity story made explicit.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.86\textwidth]{decile_gross_vs_net_250M.png}
+\caption{The cost wall, made visible. Naive \textbf{decile} @ \$250M (dollar-neutral, equal-weight, $5\%$ ADV
+cap, Section~6.3 costs): the gross alpha compounds strongly, but the $4$\,bps/night round trip turns the net
+series negative. Concentration into the tails (Table~\ref{tab:sweep}) is what recovers a positive net.}
+\end{figure}
+
+\begin{table}[h]\centering\small
+\caption{Annual net performance of the headline @ \$250M (top/bottom $2\%$, Section~6.3 costs).
+Positive in $\posYears$ years; the two negatives (2015, 2019) are mild.}\label{tab:annual}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+year & 2015 & 2016 & 2017 & 2018 & 2019 & 2020 & 2021 & 2022 & 2023 & 2024\\
+\midrule
+net ret \% & $-2.8$ & $+1.0$ & $+1.8$ & $+0.2$ & $-1.6$ & $+7.7$ & $+3.8$ & $+0.1$ & $+3.8$ & $+4.2$\\
+net Sharpe & $-1.3$ & $0.4$ & $1.1$ & $0.1$ & $-0.6$ & $1.2$ & $0.6$ & $0.1$ & $0.7$ & $0.6$\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Q6.3 --- gross$\to$net decomposition}
-The degradation is almost entirely \emph{slippage} ($1.5\,\text{bps}\times2\ \text{legs}=3$\,bps/night of
-gross), then \emph{commission} ($1$\,bps/night); \emph{borrow is negligible} ($\approx0.01$--$0.05$\,bps of
-AUM/day) because Tier-C is excluded and Tier-B is a small minority. Table \code{step5\_gross\_to\_net\_decomposition}
-reports the Sharpe lost at each stage (gross $\approx1.78\to$ net $\approx0.39$ at \$250M).
+At \$250M the Sharpe falls $1.73\,(\text{gross})\to1.40\,(\text{--commission})\to0.41\,(\text{--slippage})
+\to0.38\,(\text{net, --borrow})$. The degradation is dominated by \emph{slippage} ($1.5\,\text{bps}\times2$
+legs $=3$\,bps/night of gross; $-0.99$ of Sharpe), then \emph{commission} ($1$\,bps/night; $-0.33$);
+\emph{borrow is negligible} ($-0.04$, $\approx0.07$\,bps of AUM/day) because Tier-C is excluded and Tier-B is a
+small minority. Table \code{step5\_gross\_to\_net\_decomposition} reports each stage.
 
 \subsection{Q6.4 --- QuantStats tear-sheet}
 \code{reports/C2O\_tearsheet\_250M.html}, the \$250M headline vs \code{SP500\_TR}, OOS 2015--2024, regenerated
 from \code{python -m c2o.main}.
 
 \subsection{Q6.5 --- stress windows}
-The book is roughly market-neutral by construction. We report behaviour in 2018\,Q4, 2020\,Q1 (COVID) and
-full-2022 in \code{step5\_stress\_windows.csv}; the main dislocation risk is short-side squeeze/borrow stress,
-mitigated by Tier-C exclusion and the volatility-floor filter (which thins the eligible set in 2020\,Q1, so the
-strategy deploys less gross precisely when impact is worst).
+The book is roughly market-neutral by construction and holds up in dislocations: 2018\,Q4 net $+1.5\%$
+(Sharpe $1.15$, max DD $-1.3\%$); 2020\,Q1 COVID crash net $-1.4\%$ (max DD only $-3.4\%$); full-2022 bear
+net $+0.1\%$ (essentially flat, max DD $-5.3\%$). The main dislocation risk is short-side squeeze/borrow
+stress, mitigated by Tier-C exclusion and the volatility-floor filter, which thins the eligible set in
+2020\,Q1 so the strategy deploys less gross precisely when impact is worst.
 
 % =====================================================================================
 \section{Things a sceptical marker will ask (brief §7)}

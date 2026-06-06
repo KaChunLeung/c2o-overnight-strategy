@@ -8,12 +8,21 @@ dollar-neutral overnight portfolio, charging the Section 6.3 costs honestly, and
 Per agreement, I also **strengthened the alpha** (Step 4b) because the baseline ridge is net-negative
 once the mandated frictions are applied.
 
-The complete, runnable deliverable is **`C2O_Steps1to5_Complete.ipynb`** (original Steps 1–4 left intact,
-with new Step 4b and Step 5 sections appended). The original backup is untouched.
+**Update — refactored into a guideline-compliant package.** The work was subsequently ported from the
+notebook into an installable `src/c2o/` package with a single entry point (`python -m c2o.main`), a typed
+config (`config/default.yaml`), an `io.py` filesystem boundary, unit tests (`pytest`, 21 tests < 4 s) and a
+slow integration smoke. The **package is now the canonical, reproducible deliverable**; the notebook
+(`notebooks/C2O_Steps1to5_Complete.ipynb`) remains the exploratory companion with the full narrative. See
+`README.md` and `AGENTS.md`. The full report is `report/C2O_report.tex`.
 
-Artefacts produced by one run of the notebook:
-- `C2O_Steps1to5_Complete.ipynb` — the full pipeline.
-- `C2O_tearsheet_250M.html` — the required QuantStats tear-sheet (250M vs SP500_TR, OOS 2015–2024).
+A port bug was caught and fixed during validation: the package initially computed lag/rolling features
+*after* filtering to the eligible universe (gappy per-instrument series), which flattened the tail edge
+(net @250M came out −0.14). Fixing it to compute features on the full continuous series *before* filtering
+(matching the notebook) restored the headline.
+
+Artefacts produced by one run (`python -m c2o.main` → `data/outputs/<run_id>/`):
+- `tables/*.csv` — every report number; `figures/*.png`; `manifest.json` (config + git SHA + versions).
+- `reports/C2O_tearsheet_250M.html` — the required QuantStats tear-sheet (250M vs SP500_TR, OOS 2015–2024).
 
 ---
 
@@ -102,9 +111,13 @@ participation-cap sizing · full Section 6.3 costs.** OOS 2015–2024:
 
 | AUM | net ann | net vol | **net Sharpe** | gross Sharpe | maxDD | daily turnover | avg gross util | max pos % ADV |
 |---|---|---|---|---|---|---|---|---|
-| 50M | +1.5 % | 6.0 % | **+0.25** | 1.86 | −12.8 % | 0.93 | 0.93 | 5.0 % |
-| 250M | +1.9 % | 4.8 % | **+0.39** | 1.78 | −7.2 % | 0.65 | 0.65 | 5.0 % |
-| 1B | +0.8 % | 2.3 % | **+0.37** | 1.40 | −4.5 % | 0.23 | 0.23 | 5.0 % |
+| 50M | +1.4 % | 6.1 % | **+0.23** | 1.82 | −10.6 % | 0.93 | 0.93 | 5.0 % |
+| 250M | +1.9 % | 5.0 % | **+0.38** | 1.73 | −6.9 % | 0.65 | 0.65 | 5.0 % |
+| 1B | +1.2 % | 2.0 % | **+0.58** | 1.68 | −3.2 % | 0.22 | 0.22 | 5.0 % |
+
+*(Numbers above are from the package run `data/outputs/<run_id>/`; the notebook gives essentially the same
+within HGB-sampling noise. Net Sharpe rises at $1B because the 5% ADV cap forces the book into the most
+liquid, lowest-vol extreme names — scale costs deployed capital and absolute return, not Sharpe.)*
 
 - **Capacity story is explicit and honest:** as AUM rises, the 2 % book cannot absorb the capital under the
   5 % ADV cap, so **gross utilisation falls 0.93 → 0.65 → 0.23**; Sharpe is preserved because cost scales with

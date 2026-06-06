@@ -18,3 +18,7 @@ _*.html
 
 # stray root outputs (regenerated under data/outputs/<run_id>/)
 /C2O_tearsheet_250M.html
+
+# loose logs
+_*.log
+*.log
