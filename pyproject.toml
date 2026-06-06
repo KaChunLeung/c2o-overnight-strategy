@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c2o"
+version = "1.0.0"
+description = "C2O — daily dollar-neutral US large-cap close-to-open (overnight) long/short strategy"
+requires-python = ">=3.13"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "scipy>=1.13",
+    "scikit-learn>=1.5",
+    "pyarrow>=16",
+    "matplotlib>=3.8",
+    "PyYAML>=6.0",
+    "quantstats>=0.0.62",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+c2o = "c2o.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-m 'not slow'"   # fast verification by default; run the integration smoke with: pytest -m slow

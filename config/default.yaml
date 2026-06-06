@@ -1,0 +1,117 @@
+# C2O — reference configuration. Every path and every behaviour-bearing number lives here.
+# Code reads this file; it contains no logic. Override fields via a second YAML (e.g. fast.yaml).
+
+run:
+  seed: 7                       # global random seed (HGB, sampling)
+  fast: false                   # smoke mode: subset OOS years for a <2 min verification run
+  fast_eval_years: [2023, 2024] # OOS years used when run.fast is true
+
+paths:
+  inputs_dir: data/inputs
+  intermediary_dir: data/intermediary
+  outputs_dir: data/outputs
+  files:                        # all input filenames, declared (read-only)
+    prices: prices.parquet
+    earnings_calendar: earnings_calendar.parquet
+    short_interest: short_interest_transfo.parquet
+    cheapness: cheapness_scores.parquet
+    regime: regime.parquet
+    sp500_tr: sp500_tr.parquet
+
+window:
+  start_date: "2010-01-01"      # development window start
+  cutoff: "2024-12-31"          # anti-leakage cutoff; marker moves this to evaluate 2025-2026
+  universe_size: 1000           # top-N by market cap, frozen yearly
+  min_history_days: 365         # >= 12 months of price history to enter the yearly universe
+  residual_tolerance: 1.0e-8    # return-reconciliation tolerance
+
+capacity:
+  aum_levels: [50000000.0, 250000000.0, 1000000000.0]
+  planning_basket_names: 200    # brief's worked-example planning size (100 long + 100 short)
+  participation_cap: 0.05       # max single position as fraction of ADV20
+  impact_k: 0.70                # square-root impact constant (diagnostic only)
+  price_floor: 5.0              # min previous close (USD)
+  mcap_floor: 2000000000.0      # min year-start market cap (USD)
+  vol_min_ann: 0.05             # annualised realised-vol lower bound
+  vol_max_ann: 1.20             # annualised realised-vol upper bound
+  rolling_window: 20            # trailing window for ADV20 / vol20 / Roll spread
+  earn_window_after: 1          # post-earnings exclusion days after the event-risk session
+
+borrow:
+  trading_days_per_year: 252
+  annual_rates: {A: 0.0040, B: 0.0200, C: 0.0800}   # Section 6.3 tier schedule (p.a.)
+  dsi_moderate: 0.10            # short interest / shares-out thresholds
+  dsi_high: 0.20
+  dtcn_moderate: 7.5            # days-to-cover thresholds
+  dtcn_high: 12.5
+  ddtcn_moderate: 2.0           # change-in-days-to-cover thresholds
+  ddtcn_high: 5.0
+  moderate_pct: 0.90            # daily cross-sectional percentile flags
+  high_pct: 0.98
+  small_mcap_for_htb: 10000000000.0   # context flag: small-cap conditional on high SI
+  low_adv_for_htb: 25000000.0
+  stress_score_moderate: 2      # additive stress score -> Tier B
+  stress_score_high: 4          # additive stress score -> Tier C
+  hard_exclude_tier: "C"        # Tier C excluded from new short entries
+
+alpha:
+  signal_aum: 50000000.0        # widest base-OK set => AUM-agnostic scoring universe
+  first_eval_year: 2015         # first out-of-sample year (walk-forward expanding)
+  last_eval_year: 2024
+  ridge_lambda: 25.0
+  min_daily_names: 80           # min names per day for a valid cross-section
+  min_train_obs: 50000
+  rolling_ic_window: 63
+  zscore_clip: 5.0
+  hgb_train_sample: 700000      # cap HGB training rows for speed + reduced overfit
+  hgb:
+    max_iter: 200
+    max_depth: 4
+    learning_rate: 0.05
+    l2_regularization: 1.0
+    min_samples_leaf: 200
+  base_features:                # 21 baseline features (Step 4)
+    - r_on_today
+    - r_on_lag1
+    - r_on_5d_lag
+    - r_id_lag1
+    - r_cc_lag1
+    - r_cc_5d_lag
+    - r_cc_20d_lag
+    - vol20_ann
+    - log_adv20
+    - log_ranking_mcap
+    - roll_spread_bps
+    - dsi
+    - dtcn
+    - ddtcn
+    - borrow_stress_score
+    - valuation_score_lag
+    - quality_score_lag
+    - health_score_lag
+    - momentum_score_lag
+    - score_velocity_lag
+    - value_trap_lag
+  new_features:                 # 5 Step-4b additions
+    - gap_z
+    - range_lag1
+    - amihud_lag1
+    - vol_shock
+    - r_cc_2d_lag
+
+portfolio:
+  commission_bps_per_leg: 0.5   # Section 6.3
+  slippage_bps_per_leg: 1.5     # Section 6.3
+  headline_quantile: 0.02       # top/bottom fraction (justified by the concentration sweep)
+  headline_weighting: equal     # equal | invvol | score
+  headline_score: score_ens     # score_ens | score_hgb | score_ridge
+  htb_exclude: true             # exclude Tier-C names from the short leg
+  gate_q: 0.0                   # cost-aware dispersion gate quantile (0 = no gate)
+  benchmark_aum: 250000000.0    # AUM for the QuantStats tear-sheet
+  min_basket_names: 4           # minimum names per side to trade a day
+  concentration_sweep: [0.10, 0.05, 0.03, 0.02]
+  weighting_grid: [equal, invvol]
+  stress_windows:
+    "2018 Q4 selloff": ["2018-10-01", "2018-12-31"]
+    "2020 Q1 COVID crash": ["2020-02-19", "2020-03-31"]
+    "Full-year 2022 bear": ["2022-01-01", "2022-12-31"]

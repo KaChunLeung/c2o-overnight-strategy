@@ -1,0 +1,10 @@
+# Fast smoke overrides: small universe + a single OOS year so the full pipeline runs quickly end-to-end.
+# Overlay on default.yaml:  python -m c2o.main --overrides config/fast.yaml
+# Numbers from a fast run are NOT the headline numbers (universe is truncated); it only proves wiring.
+run:
+  fast: true
+  fast_eval_years: [2024]
+  smoke_instruments: 600
+
+capacity:
+  aum_levels: [50000000.0, 250000000.0]   # keep 50M (signal universe) + 250M (benchmark); skip 1B for speed

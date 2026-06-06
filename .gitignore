@@ -1,0 +1,20 @@
+# data, outputs, logs are never in git (the recipe is, not the ingredients)
+data/
+logs/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# local scratch / dev artefacts
+_*.py
+_*.txt
+_*.pkl
+_*.parquet
+_*.html
+*.zip
+
+# stray root outputs (regenerated under data/outputs/<run_id>/)
+/C2O_tearsheet_250M.html

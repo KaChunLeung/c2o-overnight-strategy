@@ -1,0 +1,330 @@
+% C2O — Close-to-Open: a cross-sectional, dollar-neutral overnight strategy on US large caps.
+% Machine Learning in Finance — group coursework report.
+% Compile with pdflatex (twice for references). No external bib needed.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black,citecolor=blue!50!black}
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{nosep,leftmargin=1.4em}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ---- headline numbers (single source of truth; reproduced by the code under data/outputs/<run_id>/) ----
+\newcommand{\reconResid}{4.4\times10^{-16}}
+\newcommand{\icBase}{0.017}
+\newcommand{\icHGB}{0.023}
+\newcommand{\icEns}{0.022}
+\newcommand{\icEnsT}{7.1}
+\newcommand{\spreadEns}{4.6}
+\newcommand{\grossSharpeBench}{1.78}
+\newcommand{\netSmall}{0.25}
+\newcommand{\netBench}{0.39}
+\newcommand{\netLarge}{0.37}
+\newcommand{\posYears}{7/10}
+
+\title{\textbf{C2O --- Close-to-Open}\\[2pt]
+\large A cross-sectional, dollar-neutral overnight long/short strategy on US large-cap equities}
+\author{Machine Learning in Finance --- Group Coursework}
+\date{Development window: 2010--2024 \quad(held-out evaluation: 2025--2026, single \code{cutoff} parameter)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent We build a daily, dollar-neutral, US large-cap long/short strategy that holds each position for
+exactly one overnight session (closing-auction entry, next opening-auction exit). The pipeline is
+point-in-time throughout, keyed off a single anti-leakage \code{cutoff}. The cross-sectional overnight
+alpha is genuinely present out-of-sample (ensemble mean daily IC $\approx\icEns$, $t\approx\icEnsT$; gross
+long/short Sharpe $\approx\grossSharpeBench$). The decisive finding is economic, not statistical: the
+mandated $4$\,bps round-trip cost on a \emph{forced} daily round trip, combined with dollar-neutrality
+stripping the universal overnight drift, leaves only the cross-sectional half-spread ($\approx2.3$\,bps) net
+of cost. The naive decile is therefore net-negative. We show --- via a monotone concentration sweep --- that
+trading only the tails recovers a credible, honest net Sharpe of $\netSmall/\netBench/\netLarge$ at
+\$50M/\$250M/\$1B, with a clean capacity-degradation profile. We report that number rather than an inflated
+one and document exactly where the alpha leaks.
+\end{abstract}
+
+\section*{Reproducibility (read first)}
+Every number and figure in this report is produced by one command, \code{python -m c2o.main}, which writes a
+self-describing \code{data/outputs/<run\_id>/} (tables, figures, QuantStats tear-sheet, \code{manifest.json}
+with config + git SHA). The QuantStats HTML tear-sheet at \$250M vs \code{SP500\_TR} is
+\code{reports/C2O\_tearsheet\_250M.html}. Fast verification: \code{pytest} (unit tests $<4$\,s). The development
+window is strictly 2010--2024; moving \code{window.cutoff} in \code{config/default.yaml} evaluates 2025--2026
+with no code change. Out-of-sample results begin in 2015 (2010--2014 is the walk-forward training burn-in).
+
+% =====================================================================================
+\section{Step 1 --- Building the daily panel (brief §2)}
+
+\subsection{Return objects and reconciliation}
+With $\mathrm{Open}_t,\mathrm{Close}_t$ the split/dividend-adjusted auction prices, we define
+$r_{\mathrm{ON},t}=\mathrm{Open}_t/\mathrm{Close}_{t-1}-1$,
+$r_{\mathrm{ID},t}=\mathrm{Close}_t/\mathrm{Open}_t-1$,
+$r_{\mathrm{CC},t}=\mathrm{Close}_t/\mathrm{Close}_{t-1}-1$. We place raw OHLC on the adjusted-close scale via
+a single factor $\mathrm{adjusted\_close}/\mathrm{close}$, so open and close are corporate-action-consistent
+\emph{by construction}; hence $(1+r_{\mathrm{ON}})(1+r_{\mathrm{ID}})-1\equiv r_{\mathrm{CC}}$. Empirically the
+identity holds to machine precision: the maximum absolute residual over all valid stock-days is
+$\reconResid$, far inside our reported tolerance $10^{-8}$; zero stock-days fail. This is a deliberate design
+choice --- adjusting both legs by the same factor removes the class of bug (inconsistent split handling
+between open and close) that the brief warns about; the residual then only tests floating-point arithmetic,
+which we state plainly rather than over-claim.
+
+\paragraph{Q2.1 (data source, window, survivorship).} Source: the supplied daily public-data files
+(\code{prices}, \code{earnings\_calendar}, \code{short\_interest\_transfo}, \code{cheapness\_scores},
+\code{regime}, \code{sp500\_tr}). Window: 2010--2024 for modelling; pre-2010 prices are retained only for
+lookback features. Survivorship: the panel keeps every instrument through its last observed date and selects
+the universe point-in-time at each year-start (below), so delisted names remain in the historical panel ---
+no retroactive dropping.
+
+\paragraph{Q2.2 (corporate-action reconciliation, tolerance, failures).} As above: adjusted-scale returns,
+tolerance $10^{-8}$, max residual $\reconResid$, $0\%$ of stock-days fail. We additionally flag and exclude
+from \emph{ranking} severe raw-price scale anomalies (\code{close}$>$10{,}000 with \code{adjusted\_close}$<$1{,}000)
+so a single corrupt print cannot distort the market-cap sort.
+
+\paragraph{Q2.3 (BMO/AMC encoding, verified by hand).} An after-market-close (AMC) print on day $D$ is unknown
+to a 15:50 trader on $D$; a before-market-open (BMO) print on $D$ is known. For the \emph{event-risk exclusion}
+we therefore flag the decision date whose overnight session crosses the release: AMC on $D\Rightarrow$ exclude
+decision date $D$ (overnight $D\!\to\!D{+}1$ contains the news); BMO on $D\Rightarrow$ exclude decision date
+$D{-}1$ (overnight $D{-}1\!\to\!D$ contains it); missing timing excludes both, conservatively. \emph{Hand check}
+(unit-tested in \code{tests/test\_panel.py}): for a synthetic AMC event on 2020-01-06 the flagged decision date
+is 2020-01-06; for a BMO event on 2020-01-06 it is the prior session 2020-01-03.
+
+\paragraph{Q2.4 (short-interest construction and lag).} The supplied series already embeds FINRA's
+$\sim$8-day publication lag plus the required 2-day vendor lag. On top of that we build a daily column by an
+\emph{as-of-previous-trading-day} merge: the value usable for a 15:50 decision on day $t$ is the most recent
+snapshot available on or before $t{-}1$, forward-filled between releases. Thus no same-day short-interest
+information can leak into the day-$t$ decision.
+
+\paragraph{Q2.5 (universe evolution).} On the first trading day of year $Y$ we rank all instruments by market
+cap at the last trading day of $Y{-}1$ (requiring $\ge$12 months of history), take the top
+$1{,}000$, and \emph{freeze} that list for the year; delistings leave on their last date. The selection yields
+exactly $1{,}000$ names each year by construction; mid-year exits are recorded per year (Table in
+\code{step1\_universe\_counts}).
+
+\paragraph{Q2.6 (stylised fact).} The equal-weighted overnight stream of our frozen universe dominates the
+close-to-close stream over 2010--2024, while the intraday stream is materially weaker --- reproducing the
+brief's Section~1 picture. This positive overnight \emph{drift} is precisely what dollar-neutrality will later
+cancel, which is central to our diagnosis (\S5).
+
+% =====================================================================================
+\section{Step 2 --- A capacity-aware universe (brief §3)}
+
+\paragraph{Q3.1 (thresholds, justified).} Per-share price floor \$5 (avoid pathological relative tick size);
+year-start market-cap floor \$2B (keep the set genuinely large-cap); annualised realised-volatility band
+$[5\%,120\%]$ (drop stale/near-zero and extreme-tail names); 20-day windows for ADV, volatility and the Roll
+spread; an earnings exclusion window of the event-risk overnight $+1$ trading day. ADV20 and volatility are
+shifted one day and computed on the full price history, so early-2010 rows use valid 2009 lookback without
+look-ahead.
+
+\paragraph{Q3.2 (participation cap and implied slippage).} We cap any single position at $5\%$ of trailing
+ADV20. Under the square-root convention $\text{impact}\approx k\,\sigma_{\text{daily}}\sqrt{f}\times10^4$ with
+$k=0.7$, $f=0.05$, the implied one-way slippage at the cap is single-digit bps for a typical large cap and
+modestly higher for a mid cap --- comfortably below the cross-sectional alpha we target, and consistent with
+the fixed $1.5$\,bps/leg auction slippage used for headline costs (\S5).
+
+\paragraph{Q3.3--Q3.4 (eligible-set evolution by AUM; binding-constraint distribution).} The eligibility
+table labels each (stock, date, AUM) by the single binding reason (\code{OK}, \code{ADV\_FAIL},
+\code{MCAP\_FAIL}, \code{PRICE\_FAIL}, \code{VOL\_FAIL}, \code{EARN\_WINDOW}). Median daily \code{OK} names
+fall from $\approx852$ at \$50M to $\approx714$ at \$250M to $\approx379$ at \$1B --- the expected capacity
+contraction, driven by \code{ADV\_FAIL} as AUM rises. The volatility floor bites visibly in 2020\,Q1
+(\code{step2\_binding\_250M.csv}). \emph{Design note}: Step~2 uses the brief's $200$-name \emph{planning} size
+for the ADV test; the actual book is sized exactly by the Step~5 water-fill, so the two are consistent and the
+residual capacity shows up honestly as gross-utilisation $<1$ (\S5).
+
+% =====================================================================================
+\section{Step 3 --- Filtering the short leg for borrow (brief §4)}
+
+\paragraph{Q4.1 (hard-to-borrow proxy).} From the lagged short-interest features --- short-interest ratio
+\code{dsi}, days-to-cover \code{dtcn}, change \code{ddtcn} --- we combine absolute thresholds
+($\code{dsi}\ge10\%/20\%$, $\code{dtcn}\ge7.5/12.5$, $\code{ddtcn}\ge2/5$) with daily cross-sectional
+$90^{\text{th}}/98^{\text{th}}$ percentile flags and a size/liquidity context flag (high SI conditional on
+small cap or low ADV). An additive stress score maps to tiers: A (general collateral), B (score$\ge2$ or both
+\code{dsi}\,\&\,\code{dtcn} moderate), C (score$\ge4$ or both high).
+
+\paragraph{Q4.2 (validation).} Internally, tier B/C names show markedly higher median \code{dsi}, \code{dtcn}
+and \code{ddtcn} than tier A. Externally the proxy flags the documented crowded-short episodes when those
+names are in-universe (e.g.\ the January 2021 meme-stock complex; Carvana 2023--24), consistent with public
+SEC/Reuters reporting.
+
+\paragraph{Q4.3--Q4.4 (treatment; gross-vs-net borrow impact).} We use \emph{both}: tier A/B remain shortable
+and are charged the Section~6.3 rate ($40/200$\,bps p.a.); tier C is \emph{excluded} from new shorts. Tier
+shares among base-\code{OK}@\$250M are roughly A~$87\%$, B~$9\%$, C~$4\%$. Because tier C is excluded and B is a
+small minority, the borrow drag is tiny --- $\approx0.01$--$0.05$\,bps of AUM per day (\S5 decomposition) ---
+so the strategy is demonstrably \emph{not} borrow-cost arbitrage in disguise (we confirm this directly in
+\S6).
+
+% =====================================================================================
+\section{Step 4 --- The cross-sectional alpha (brief §5)}
+
+\paragraph{Q5.1 (information set and target).} The score $s_{i,t}$ uses only $\mathcal{F}_t$ observable by
+15:50 ET on day $t$: today's overnight gap $r_{\mathrm{ON},t}$ (the single freshest signal --- the open is
+known) and its surprise \code{gap\_z} (gap standardised by trailing own-overnight vol through $t{-}1$); lagged
+return features ($r_{\mathrm{ON}},r_{\mathrm{ID}},r_{\mathrm{CC}}$ at horizons 1/2/5/20d through $t{-}1$); a
+lagged Parkinson range, lagged Amihud illiquidity, and a volume shock; one-day-shifted ADV/volatility/Roll
+spread; lagged short-interest and borrow-stress; and cheapness/quality scores merged on the previous trading
+day. The prediction target is the next-session overnight return $r_{\mathrm{ON},t+1}$; for fitting we use its
+daily cross-sectional rank ($\mathrm{rank}-0.5$), matching the rank-IC objective and taming outliers. Every
+feature is line-by-line observable at 15:50 (unit-tested for the lag/no-leak invariants).
+
+\paragraph{Q5.2 (model class and training scheme).} An \emph{ensemble} of a ridge (linear, on z-scored
+features) and a \code{HistGradientBoostingRegressor} (non-linear, on raw features; handles NaNs natively),
+combined by daily cross-sectional \emph{rank average}. Training is walk-forward expanding: the model scoring
+year $Y$ is fit only on rows dated before $Y$ (first OOS year 2015). Seeds are fixed. Crucially, the alpha is
+scored on an \emph{AUM-agnostic} signal universe (base-\code{OK} at the most permissive \$50M level) so the
+identical signal is evaluated honestly at all three AUMs, with capacity applied only in Step~5.
+
+\paragraph{Q5.3 (IC and stability).} Out-of-sample 2015--2024: ridge mean IC $\approx\icBase$, HGB
+$\approx\icHGB$ ($t\approx7.9$), ensemble $\approx\icEns$ ($t\approx\icEnsT$, positive on $\approx58\%$ of
+days), lifting the decile long/short spread from $\approx3.6$ to $\approx\spreadEns$\,bps and the gross
+pre-cost L/S Sharpe from $\approx1.1$ to $\approx1.6$. IC is positive every year (Table
+\code{step4b\_ic\_by\_year}); it is strongest 2015--2018 and weakest 2022--2023 (crowded-reversal and
+one-directional-momentum regimes).
+
+\paragraph{Q5.4 (ablation).} The non-linear learner is the source of the gain: removing it (ridge only)
+returns IC to the $\approx\icBase$ baseline. The ensemble does not collapse when any single feature group is
+removed; the lagged-trend and risk/liquidity groups contribute most, borrow features least (they are more
+useful as Step~3 constraints than as predictors).
+
+\paragraph{Q5.5 (what it does badly).} Weakest in 2022--2023 and in the \code{Overweight} regime: lagged daily
+reversal/trend signals degrade when macro shocks drive persistent one-way moves. We do not hide this; it is
+why robustness (\S6) weighs sub-period stability over peak Sharpe.
+
+% =====================================================================================
+\section{Step 5 --- From ranking to portfolio, with realistic costs (brief §6)}
+
+\subsection{The central economic finding}
+A dollar-neutral book earns $\tfrac12(L-S)$ per unit gross. The mandated round trip is MOC entry $+$ MOO exit
+$=4.0$\,bps of gross \emph{every night}, and the overnight position must be fully liquidated each morning, so
+turnover is structurally $\approx100\%$/day and cannot be reduced by signal smoothing --- the standard
+turnover trick is \emph{inapplicable} here (a deliberate judgement: we did not port it from prior work). With
+an ensemble decile spread of $\approx\spreadEns$\,bps, $\tfrac12\cdot\spreadEns=2.3$\,bps of gross edge
+$<4$\,bps cost, so the naive decile is net-negative. Decomposing the legs: the \emph{long} leg clears the cost
+per name (top names earn $\approx6$\,bps overnight including the Section~1 drift), but the \emph{short} leg
+fights that drift (even the lowest-ranked names drift $\approx+2$\,bps, so shorting them loses
+$\approx6$\,bps net). \textbf{Dollar-neutrality removes the profitable drift and forces half the book into the
+drift-fighting short side.} Net profitability therefore requires the cross-sectional spread to exceed
+$\approx8$\,bps --- delivered only by the extreme tails of a strong alpha.
+
+\subsection{Q6.1 --- baskets, weighting, turnover; and the concentration mechanism}
+We size dollar-neutral baskets with the brief's participation-cap water-fill: cap each name at $5\%$ of ADV20,
+redistribute the excess pro-rata, and reduce gross if the basket cannot absorb the target. Within a basket we
+equal-weight (more robust than inverse-vol at the tails). One-way turnover is $\approx100\%$ of \emph{deployed}
+gross per night --- structural, as above.
+
+Net Sharpe is \emph{monotone} in tail-extremity (Table~\ref{tab:sweep}): this is an economic mechanism (edge
+density rising into the tails against a fixed cost), not a cherry-picked quantile. We therefore adopt the
+top/bottom $2\%$ as the headline, with the conventional decile shown as the naive baseline.
+
+\begin{table}[h]\centering\small
+\caption{Concentration sweep @ \$250M (dollar-neutral, equal-weight, $5\%$ ADV cap, Section~6.3 costs, OOS
+2015--2024). Net Sharpe rises monotonically into the tails; the cap forces lower gross utilisation as the
+book concentrates.}\label{tab:sweep}
+\begin{tabular}{lrrrrr}
+\toprule
+top/bottom & gross Sharpe & \textbf{net Sharpe} & net ann.\ \% & max DD \% & gross util.\\
+\midrule
+10\% (decile) & 1.53 & $-1.01$ & $-4.1$ & $-34.9$ & 1.00\\
+5\%          & 1.51 & $-0.49$ & $-2.5$ & $-24.4$ & 0.99\\
+3\%          & 1.65 & $+0.03$ & $+0.2$ & $-13.7$ & 0.84\\
+\textbf{2\% (headline)} & \textbf{1.78} & $\mathbf{+0.39}$ & $\mathbf{+1.9}$ & $-7.2$ & 0.65\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Q6.2 --- headline table at \$50M / \$250M / \$1B}
+\begin{table}[h]\centering\small
+\caption{Headline performance --- ensemble alpha, top/bottom $2\%$, equal-weight, dollar-neutral, Tier-C
+shorts excluded, $5\%$ ADV participation cap, Section~6.3 cost schedule, OOS 2015--2024.}\label{tab:headline}
+\begin{tabular}{lrrrrrrr}
+\toprule
+AUM & net ann.\ & net vol & \textbf{net Sharpe} & gross Sharpe & max DD & daily turn. & gross util.\\
+\midrule
+\$50M  & $+1.5\%$ & $6.0\%$ & $\mathbf{+\netSmall}$ & 1.86 & $-12.8\%$ & 0.93 & 0.93\\
+\$250M & $+1.9\%$ & $4.8\%$ & $\mathbf{+\netBench}$ & 1.78 & $-7.2\%$  & 0.65 & 0.65\\
+\$1B   & $+0.8\%$ & $2.3\%$ & $\mathbf{+\netLarge}$ & 1.40 & $-4.5\%$  & 0.23 & 0.23\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent As AUM rises the $2\%$ book cannot absorb the capital under the $5\%$ ADV cap, so gross utilisation
+falls ($0.93\!\to\!0.65\!\to\!0.23$) while every position is pinned at the $5\%$ cap; Sharpe is preserved
+because cost scales with deployed gross. This is the capacity story made explicit.
+
+\subsection{Q6.3 --- gross$\to$net decomposition}
+The degradation is almost entirely \emph{slippage} ($1.5\,\text{bps}\times2\ \text{legs}=3$\,bps/night of
+gross), then \emph{commission} ($1$\,bps/night); \emph{borrow is negligible} ($\approx0.01$--$0.05$\,bps of
+AUM/day) because Tier-C is excluded and Tier-B is a small minority. Table \code{step5\_gross\_to\_net\_decomposition}
+reports the Sharpe lost at each stage (gross $\approx1.78\to$ net $\approx0.39$ at \$250M).
+
+\subsection{Q6.4 --- QuantStats tear-sheet}
+\code{reports/C2O\_tearsheet\_250M.html}, the \$250M headline vs \code{SP500\_TR}, OOS 2015--2024, regenerated
+from \code{python -m c2o.main}.
+
+\subsection{Q6.5 --- stress windows}
+The book is roughly market-neutral by construction. We report behaviour in 2018\,Q4, 2020\,Q1 (COVID) and
+full-2022 in \code{step5\_stress\_windows.csv}; the main dislocation risk is short-side squeeze/borrow stress,
+mitigated by Tier-C exclusion and the volatility-floor filter (which thins the eligible set in 2020\,Q1, so the
+strategy deploys less gross precisely when impact is worst).
+
+% =====================================================================================
+\section{Things a sceptical marker will ask (brief §7)}
+
+\paragraph{Look-ahead, in all forms.} Every feature is observable at 15:50: today's open only, otherwise
+$t{-}1$ and earlier (lagged OHLCV, Roll spread, ADV, volatility); AMC earnings shifted forward; short interest
+as-of $t{-}1$ with the publication+vendor lag; cross-sectional z-scores and the rank target use only the
+current day's cross-section; the universe uses only prior-year-end information. The walk-forward model never
+sees its own scoring year. These invariants are unit-tested (\code{tests/test\_panel.py},
+\code{tests/test\_alpha.py}) and re-checked by an explicit audit; the return reconciliation max residual is
+$\reconResid$.
+
+\paragraph{Statistical robustness.} Net performance is positive in $\posYears$ years; the gross IC is positive
+in all ten. We weight sub-period stability over peak Sharpe (hence the $2\%$ tails rather than a higher but
+fragile setting), and the concentration result is a monotone sweep, not one tuned point. A robustness grid
+(\code{step5\_robustness\_grid}) varies the alpha (ensemble/HGB/ridge), the weighting (equal/inverse-vol) and
+the dispersion gate; the headline is the most stable defensible choice.
+
+\paragraph{Capacity and execution honesty.} The $5\%$ participation cap genuinely binds --- average max
+position sits exactly at $5\%$ of ADV and gross utilisation falls from $0.93$ to $0.23$ across AUM; re-running
+without the cap gives different (more optimistic) numbers, so liquidity is not assumed infinite. The Step~2
+square-root slippage diagnostic is consistent with the $1.5$\,bps/leg headline charge.
+
+\paragraph{Borrow honesty.} Replacing the tiered cost with a hard exclusion of high-short-interest names leaves
+the Sharpe qualitatively unchanged (borrow contributes $<0.1$\,bps/day), so the alpha does not live in
+expensive-to-borrow names. Tier-C is excluded entirely.
+
+\paragraph{Reporting integrity.} Every chart and number regenerates from one command into a per-run directory
+with a \code{manifest.json} (config + git SHA + versions); all randomness is seeded; figure captions disclose
+AUM, basket size, participation cap and cost schedule.
+
+% =====================================================================================
+\section{Innovation declaration (what our judgement added)}
+\begin{enumerate}
+\item \textbf{Reframing the problem as cost-structural, not predictive.} The instinctive move is to chase a
+bigger model. We instead measured, up front, that under the brief's frictions the binding constraint is the
+$4$\,bps forced daily round trip against a $\tfrac12$-spread edge, and that \emph{turnover reduction is
+inapplicable} because the overnight mandate forces a full round trip nightly. An off-the-shelf assistant would
+have ``reduced turnover with signal smoothing'' --- which does nothing here. This reframing redirected all
+effort to widening the cross-sectional spread and to tail concentration.
+\item \textbf{The long/short drift asymmetry as the core diagnosis.} We decomposed the legs and showed the
+long side clears cost while the short side fights the very overnight drift that makes the index attractive
+(Section~1); dollar-neutrality then guarantees the drift cancels and only the sub-cost half-spread remains.
+This turns ``the strategy loses to costs'' into a precise, defensible economic statement, and motivates the
+monotone concentration result rather than a tuned quantile.
+\item \textbf{AUM-agnostic signal, capacity applied at construction.} Rather than re-fitting per AUM, we score
+one signal universe and let the participation-cap water-fill express capacity as falling gross utilisation ---
+giving an honest, comparable three-AUM table where the difference is capacity, not a moving model.
+\end{enumerate}
+
+\section*{Appendix --- reproduction}
+\code{pip install -e .}; \code{python -m c2o.main} (full) or \code{--overrides config/fast.yaml} (smoke);
+\code{pytest} (units). Held-out: set \code{window.cutoff} to \code{2026-12-31}. All paths and numeric constants
+live in \code{config/default.yaml}; \code{io.py} is the only filesystem boundary; steps are pure, typed
+functions orchestrated by \code{main.py}.
+
+\end{document}
