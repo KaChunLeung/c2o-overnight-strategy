@@ -1,36 +1,44 @@
 # C2O — Innovation Declaration (one page)
 
-Where our judgement went beyond what an off-the-shelf LLM would have proposed. We used LLM tooling as a
-coding assistant; the three choices below are ours, and they shaped the entire submission.
+Where our judgement went beyond what an off-the-shelf assistant would have proposed. We used LLM tooling as a
+coding assistant; the choices below are ours, and they shaped the entire submission. The unifying idea: we
+treated the search for net Sharpe as a **controlled experiment** and shipped the **negative results**.
 
-### 1. We reframed the task as cost-structural, not predictive — and rejected the obvious "turnover" fix.
-The default LLM move on a high-turnover strategy is "reduce turnover with signal smoothing / rebalance bands."
-We measured, up front, that this is **inapplicable here**: the brief mandates an overnight-only book that is
-fully liquidated every morning, so a full MOC→MOO round trip (4 bps) is incurred *every night regardless of
-the signal* — smoothing changes which names trade, not the gross traded, so it cannot cut cost. Recognising
-this redirected all our effort from "a bigger model" to the two levers that actually move the net: widening
-the cross-sectional spread and concentrating into the tails. This is the single most important judgement in the
-project and it is the opposite of the generic recommendation.
+### 1. We pursued the brief's "Sharpe > 1" ambition seriously — and reported, honestly, that we did not reach it.
+The easy path is to bolt on models and overlays and present whichever number looks best. We instead
+pre-registered a slate of levers — a fundamental-flow alpha sleeve, a neural model, cost-aware per-name
+selection, edge-proportional gross scaling, sector/beta neutralization, vol-targeting, inverse-vol weighting —
+and **measured each against a concentrated baseline**, finding and documenting that none of them beat it. We
+roughly **doubled** the v1 net Sharpe (0.38 → **0.71** headline, **0.80** frontier at \$250M) by correctly
+locating the concentration optimum, and we state plainly that net Sharpe ≈ 0.7–0.8 is the **honest ceiling** of
+this mandate. The discipline of shipping the failed levers — not burying them — is the core contribution.
 
-### 2. We diagnosed the long/short drift asymmetry as the reason the strategy is hard.
-We decomposed the two legs and found that the **long** leg clears the cost per name (top names earn ≈6 bps
-overnight, riding the universal overnight drift of the brief's Section 1), while the **short** leg *fights*
-that same drift (even the lowest-ranked names drift ≈+2 bps overnight, so shorting them loses ≈6 bps net).
-Dollar-neutrality then guarantees the profitable drift cancels and only the sub-cost half-spread remains.
-This turns a vague "the alpha loses to costs" into a precise, defensible economic statement, and it *predicts*
-the result we then verified: net Sharpe is monotone in tail-extremity (decile −1.0 → 2% +0.4), because only the
-extreme tails carry a spread above the fixed cost. We report this honest ~0.4 rather than an inflated number,
-exactly as the brief rewards.
+### 2. The cost-structure diagnosis that *predicts* every failed lever.
+We showed the mandated 4 bps is charged on the **gross** book, on a **forced** nightly liquidation. That single
+fact has three consequences we then verified: (a) **per-name "cost-aware" selection cannot reduce cost** —
+splitting the same gross over 5 or 50 names costs the same (it traded ~10% of nights and *lowered* Sharpe); (b)
+**turnover reduction is inapplicable** (the overnight mandate forces the round trip nightly), so the standard
+smoothing trick is moot; (c) the **only** way to cut cost is to scale gross down on thin nights — which requires
+*timing* the good nights, and we measured the correlation between the alpha's predicted day-edge and the
+realised next-night return at **≈ −0.003**: the good nights are not predictable. An off-the-shelf assistant
+would have "reduced turnover" or "added a regime gate"; we showed, with numbers, why neither can work here.
 
-### 3. We made the alpha AUM-agnostic and pushed capacity entirely into portfolio construction.
-Rather than re-fitting a model per AUM level, we score one signal universe (base-eligible at the most
-permissive AUM) and let the participation-cap **water-fill** express capacity as falling gross utilisation
-(0.93 → 0.65 → 0.22 across \$50M/\$250M/\$1B). This yields an honest, apples-to-apples three-AUM table where
-the only thing that changes is deployable capital — and it surfaced a non-obvious result we would have missed
-otherwise: risk-adjusted performance is *not* degraded by scale (net Sharpe actually rises to +0.58 at \$1B)
-because the binding cap forces the book into the most liquid, lowest-volatility names. Scale costs absolute
-return and deployed capital, not Sharpe.
+### 3. An orthogonal sleeve — and the "broad IC ≠ tail edge" lesson.
+We built a genuinely orthogonal fundamental-flow sleeve (analyst revisions / earnings surprise; rank-corr only
+0.11 to the price sleeve, strongest exactly where the price alpha has decayed). Blending it **raises
+full-cross-section IC (0.022 → 0.024) yet lowers the net Sharpe of the tail book**. The non-obvious lesson:
+a strategy that trades only the extreme ~1% should *not* dilute its strongest names with a milder signal —
+higher average rank-skill is not the same as a better tail. This reframes how sleeves should (and should not)
+be combined for concentrated books, and it is why we keep the flow sleeve documented but out of the headline.
 
-*(A self-inflicted but instructive catch: when porting the notebook to the package we initially computed lag
-features after filtering to the eligible set, which silently flattened the tail edge. We caught it because the
-package reproduces the notebook's numbers under test — a concrete payoff of the reproducibility discipline.)*
+### 4. AUM-agnostic signal, capacity applied at construction — surfacing that scale is the variance lever.
+Rather than re-fit per AUM, we score one signal universe and let the participation-cap water-fill express
+capacity, giving an honest three-AUM table where the only thing that changes is deployable capital. This
+surfaced a non-obvious result: net Sharpe **peaks at \$250M**, where the 5% ADV cap forces the book into the
+most liquid, lowest-volatility names — the capacity constraint itself performs the variance reduction the cost
+structure otherwise denies us — while aggressive concentration (the 1% frontier) *collapses* at \$1B as the
+book thins to ~5 names. Scale is not merely a cost; under this mandate it is the main risk-adjustment lever.
+
+*(Honest tooling note: PyTorch has no wheels for the Python 3.14 toolchain here, so the neural benchmark uses a
+scikit-learn MLP trained with Adam; we argue why a deeper recurrent/attention model would not change the
+conclusion, since the binding constraint is execution cost, not forecast accuracy.)*

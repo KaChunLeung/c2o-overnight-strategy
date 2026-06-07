@@ -83,7 +83,7 @@ def build_capacity(cfg: Config, pr: PanelResult) -> CapacityResult:
                      .merge(pr.earn_window[["instrument_id", "date", "is_earn_window",
                                             "earnings_timing", "earnings_reporting_date"]],
                             on=["instrument_id", "date"], how="left"))
-    step2["is_earn_window"] = step2["is_earn_window"].fillna(False).astype(bool)
+    step2["is_earn_window"] = step2["is_earn_window"].eq(True)   # NaN/absent -> False (no fillna downcast warning)
     step2 = step2.sort_values(["instrument_id", "date"]).reset_index(drop=True)
 
     eligibility, binding = {}, {}

@@ -10,10 +10,64 @@ once the mandated frictions are applied.
 
 **Update — refactored into a guideline-compliant package.** The work was subsequently ported from the
 notebook into an installable `src/c2o/` package with a single entry point (`python -m c2o.main`), a typed
-config (`config/default.yaml`), an `io.py` filesystem boundary, unit tests (`pytest`, 21 tests < 4 s) and a
+config (`config/default.yaml`), an `io.py` filesystem boundary, unit tests (`pytest`, 26 tests < 5 s) and a
 slow integration smoke. The **package is now the canonical, reproducible deliverable**; the notebook
 (`notebooks/C2O_Steps1to5_Complete.ipynb`) remains the exploratory companion with the full narrative. See
 `README.md` and `AGENTS.md`. The full report is `report/C2O_report.tex`.
+
+---
+
+## v2 — Pushing net Sharpe (the controlled-experiment update)
+
+**Goal of v2.** The brief aspires to Sharpe > 1 and the report should be 15–20pp; the v1 headline was an honest
+but modest net Sharpe 0.23/0.38/0.58 @ 50M/250M/1B. v2 treats the search for net Sharpe as a *controlled
+experiment*: build the candidate levers, then measure each one honestly and ship the negative results.
+
+**What was built (all code, tested, kept in the package even where the lever failed).**
+- **Fundamental-flow sleeve** (`alpha.py`): a second HGB on analyst-revision / earnings-surprise features
+  (`deps`, forward EPS, short/long revisions, `sue`, fraction up/down, post-earnings clock, SI change) from
+  `earnings_transfo.parquet`, merged *as-of the prior trading day* (new look-ahead unit test). IC-weighted
+  walk-forward combination with the price sleeve; per-sleeve IC + correlation diagnostics.
+- **Walk-forward edge calibration** (`alpha.py`): maps `score_combined` to an expected cross-sectional *excess*
+  overnight return (the drift cancels in a dollar-neutral book).
+- **Cost-aware per-name selection, sector/beta neutralization, vol-targeting, inverse-vol weighting**
+  (`portfolio.py`), all config-toggleable; `main.py` runs a disciplined **headline** and an aggressive
+  **frontier** book; `reporting.py` writes a Sharpe-ladder ablation, sleeve IC/correlation, frontier 3-AUM.
+- **DL benchmark** (`dl_alpha.py`, off the production path): MLP and MLP+lag-window (Adam) vs HGB. (PyTorch has
+  no Python-3.14 wheels here, so the neural family is `sklearn.MLPRegressor`; documented honestly.)
+- **Construction lab** (`tools/experiment*.py`): caches the trade panel once, then sweeps variants in seconds.
+
+**What the experiment found (the central v2 result).**
+1. The **cost is on GROSS, on a forced nightly round trip** ⇒ (a) per-name cost-aware selection cannot reduce
+   it (it traded ~10% of nights and *cut Sharpe*), (b) the only way to cut cost is to scale gross down on
+   low-edge nights — but predicted day-edge has **~0 correlation (−0.003)** with realised net return, so the
+   good nights cannot be timed; day-gating/edge-scaling fails.
+2. The **flow sleeve is real and orthogonal** (IC 0.0135, t 6.8; rank-corr 0.11 to price) and lifts
+   *full-cross-section* IC (0.0223 → 0.0242) — but **blending it lowers the net Sharpe of the TAIL book**
+   (broad IC ≠ tail edge). It is documented and ablated, not in the headline.
+3. **Sector/beta neutralization, vol-targeting, inverse-vol** all fail to beat equal-weight tail concentration.
+4. **The HGB beats the MLP/MLP-seq** (IC 0.024 vs 0.020/0.020) — forecast accuracy is not the bottleneck.
+5. **The only lever that works is tail concentration.** The v1 2% was sub-optimal; net Sharpe peaks on a broad
+   1–1.5% plateau. **Headline = reversal ensemble @ 1.25% tails: net Sharpe 0.32 / 0.71 / 0.58 @ 50M/250M/1B
+   (peaks at 250M), 8/10 positive years.** Frontier = pure HGB @ 1% tails: 0.74 / **0.80** / 0.05 (best single
+   number at 250M; collapses at 1B as the 1% book thins to ~5 names — a capacity limit of aggressive concentration).
+
+**Report figures (reproducible).** `reporting.py` now emits 9 figures, each supporting a specific argument:
+headline performance panel (equity vs S&P500 TR + underwater), monthly-returns heatmap, daily-return
+distribution (skew +0.73), concentration curve (net vs gross Sharpe vs tail %), net-Sharpe-vs-AUM (the capacity
+hump), per-sleeve equity curves (flow drags the tail), the Sharpe ladder, the decile cost-wall, and rolling IC.
+They regenerate under `data/outputs/<run_id>/figures/` and are copied into `report/figures/` (the QuantStats
+HTML tear-sheet can't embed in a PDF, so its key panels are reproduced as PNGs). The report
+(`report/C2O_report.tex`) is ~18–20pp: 13 sections, 11 tables, 9 figures, incl.\ an overnight-anomaly economics
+section, a closed-form cost ceiling (Sharpe_net = Sharpe_gross − c/σ), an anti-overfit "final deliverable"
+section, and a data-provenance appendix.
+
+**Honest verdict.** v2 roughly **doubles** the v1 net Sharpe (0.38 → 0.71 headline, 0.80 frontier @ 250M) by
+correctly locating the concentration optimum. **Sharpe > 1 was not reached and is not claimed**: cost is a
+near-fixed ~1.3 Sharpe-units of drag on ~5% vol, so net ≈ gross Sharpe − 1.3, and reaching 1.0 would need gross
+Sharpe ~2.4 (we have 1.81) or relaxing a mandate constraint (multi-day holds to amortise the round trip, or a
+net-long drift tilt). The report (`report/C2O_report.tex`) presents the full investigation, including the
+failed levers, as the deliverable.
 
 A port bug was caught and fixed during validation: the package initially computed lag/rolling features
 *after* filtering to the eligible universe (gappy per-instrument series), which flattened the tail edge

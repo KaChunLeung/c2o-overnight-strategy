@@ -1,7 +1,8 @@
 """All filesystem access for the C2O pipeline (the only module that touches the disk).
 
 Public API:
-    load_prices / load_earnings / load_short_interest / load_cheapness / load_regime / load_sp500_tr
+    load_prices / load_earnings / load_earnings_transfo / load_short_interest / load_cheapness
+    load_gics / load_regime / load_sp500_tr
     read_intermediary / write_intermediary
     new_run_dir / write_table / write_figure / write_manifest
 
@@ -64,6 +65,23 @@ def load_cheapness(cfg: Config) -> pd.DataFrame:
     df = pd.read_parquet(cfg.paths.input("cheapness"), columns=_CHEAPNESS_COLUMNS)
     df["date"] = pd.to_datetime(df["date"])
     return df.loc[df["date"] <= pd.Timestamp(cfg.window.cutoff)].copy()
+
+
+def load_earnings_transfo(cfg: Config) -> pd.DataFrame:
+    """Analyst-revision / earnings-surprise features (flow sleeve), merged as-of the previous trading day.
+
+    ``stock_id`` is the same identifier space as ``prices.instrument_id`` (verified). Cutoff-filtered.
+    """
+    df = pd.read_parquet(cfg.paths.input("earnings_transfo"))
+    df = df.rename(columns={"stock_id": "instrument_id", "date": "earn_feat_date"})
+    df["earn_feat_date"] = pd.to_datetime(df["earn_feat_date"])
+    return df.loc[df["earn_feat_date"] <= pd.Timestamp(cfg.window.cutoff)].copy()
+
+
+def load_gics(cfg: Config) -> pd.DataFrame:
+    """Static GICS sector map (instrument_id -> sector). Used for sector-neutral construction."""
+    df = pd.read_parquet(cfg.paths.input("gics"), columns=["instrument_id", "sector"])
+    return df.drop_duplicates("instrument_id").copy()
 
 
 def load_regime(cfg: Config) -> pd.DataFrame:

@@ -82,6 +82,10 @@ class AlphaCfg:
     hgb: dict[str, Any]
     base_features: list[str]
     new_features: list[str]
+    # --- v2 multi-sleeve additions (defaults keep the single-sleeve path working) ---
+    flow_features: list[str] = field(default_factory=list)   # earnings/revision sleeve inputs
+    sleeve_combine: str = "ic_weighted"                      # ic_weighted | equal | reversal_only
+    edge_calib_buckets: int = 25                             # score->E[excess bps] calibration buckets
 
     @property
     def raw_features(self) -> list[str]:
@@ -106,6 +110,18 @@ class PortfolioCfg:
     concentration_sweep: list[float]
     weighting_grid: list[str]
     stress_windows: dict[str, list[str]]
+    # --- v2 portfolio-construction levers (defaults reproduce the v1 quantile book) ---
+    selection_mode: str = "quantile"               # quantile | cost_aware
+    cost_buffer_c: float = 1.0                      # per-side bar = c * round_trip_bps (+borrow for shorts)
+    min_edge_names: int = 4                         # min names per side under cost-aware selection
+    neutralize_sector: bool = False                # within-GICS-sector demean of the selection signal
+    neutralize_beta: bool = False                  # residualise the selection signal on trailing market beta
+    beta_lookback: int = 60                        # trailing sessions for the r_cc-vs-market beta
+    vol_target_enabled: bool = False               # scale daily gross to a constant target vol
+    vol_target_ann: float = 0.06                   # annualised net-vol target
+    vol_target_lookback: int = 42                  # trailing sessions for realised-vol estimate
+    vol_target_clip: list[float] = field(default_factory=lambda: [0.5, 2.0])
+    frontier: dict[str, Any] = field(default_factory=dict)   # aggressive variant overrides
 
     @property
     def round_trip_bps(self) -> float:

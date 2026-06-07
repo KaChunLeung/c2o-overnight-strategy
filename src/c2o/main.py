@@ -31,6 +31,27 @@ def _step(name: str, start: float) -> None:
     logger.info("%-28s done (%6.1fs elapsed)", name, time.time() - start)
 
 
+def _book_kwargs(overrides: dict) -> dict:
+    """Map a portfolio override dict (e.g. the frontier block) to run_strategy keyword arguments."""
+    return dict(score=overrides.get("headline_score"),
+                quantile=overrides.get("headline_quantile"),
+                weighting=overrides.get("headline_weighting"),
+                selection_mode=overrides.get("selection_mode"),
+                cost_buffer_c=overrides.get("cost_buffer_c"),
+                neutralize_sector=overrides.get("neutralize_sector"),
+                neutralize_beta=overrides.get("neutralize_beta"),
+                vol_target=overrides.get("vol_target_enabled"),
+                vol_target_ann=overrides.get("vol_target_ann"))
+
+
+def _run_book(cfg: Config, trade_panel, capacity, borrow, overrides: dict | None = None) -> dict:
+    """Run one configured book (headline = config defaults; frontier = overrides) at every AUM level."""
+    kw = _book_kwargs(overrides or {})
+    return {aum: run_strategy(cfg, trade_panel, capacity.eligibility_by_aum[aum],
+                              borrow.short_eligibility_by_aum[aum], aum, **kw)
+            for aum in cfg.capacity.aum_levels}
+
+
 def main(cfg: Config) -> dict:
     """Run the full pipeline and return a summary dict (also persisted in the run manifest)."""
     t0 = time.time()
@@ -42,7 +63,7 @@ def main(cfg: Config) -> dict:
     _step("load inputs", t0)
 
     panel = build_panel(cfg, prices, earnings, short_interest)
-    del prices, earnings
+    del prices
     _step("step1 panel", t0)
 
     capacity = build_capacity(cfg, panel)
@@ -54,18 +75,21 @@ def main(cfg: Config) -> dict:
     _step("step3 borrow", t0)
 
     alpha = build_alpha(cfg, borrow.borrow_panel, capacity.eligibility_by_aum,
-                        io.load_cheapness(cfg), io.load_regime(cfg), panel.calendar)
+                        io.load_cheapness(cfg), io.load_regime(cfg),
+                        io.load_earnings_transfo(cfg), earnings, panel.calendar)
+    del earnings
     _step("step4b alpha", t0)
 
-    trade_panel = build_trade_panel(cfg, alpha.scores, borrow.borrow_panel)
-    headline_runs = {aum: run_strategy(cfg, trade_panel, capacity.eligibility_by_aum[aum],
-                                       borrow.short_eligibility_by_aum[aum], aum)
-                     for aum in cfg.capacity.aum_levels}
+    sp500_tr = io.load_sp500_tr(cfg)
+    trade_panel = build_trade_panel(cfg, alpha.scores, borrow.borrow_panel,
+                                    gics=io.load_gics(cfg), market_ret=sp500_tr)
+    headline_runs = _run_book(cfg, trade_panel, capacity, borrow)
+    frontier_runs = _run_book(cfg, trade_panel, capacity, borrow, cfg.portfolio.frontier)
     _step("step5 portfolio", t0)
 
     run_dir = io.new_run_dir(cfg)
     summary = write_all(cfg, run_dir, panel, capacity, borrow, alpha, trade_panel,
-                        headline_runs, io.load_sp500_tr(cfg))
+                        headline_runs, frontier_runs, sp500_tr)
     io.write_manifest(run_dir, cfg, extra=summary)
     _step("reporting", t0)
 

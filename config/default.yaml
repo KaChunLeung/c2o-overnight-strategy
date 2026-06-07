@@ -13,8 +13,10 @@ paths:
   files:                        # all input filenames, declared (read-only)
     prices: prices.parquet
     earnings_calendar: earnings_calendar.parquet
+    earnings_transfo: earnings_transfo.parquet   # analyst-revision / surprise features (flow sleeve)
     short_interest: short_interest_transfo.parquet
     cheapness: cheapness_scores.parquet
+    gics: gics_info.parquet                       # sector codes (neutralization)
     regime: regime.parquet
     sp500_tr: sp500_tr.parquet
 
@@ -98,20 +100,65 @@ alpha:
     - amihud_lag1
     - vol_shock
     - r_cc_2d_lag
+  # --- v2 fundamental-flow sleeve (earnings revisions / surprise; merged as-of prior trading day) ---
+  flow_features:                # well-covered daily backbone + sparse earnings-day boosters (HGB NaN-native)
+    - deps_lag                  # daily change in EPS estimate (revision)
+    - epsf_lag                  # forward EPS estimate level
+    - epsp_lag                  # reported/preliminary EPS
+    - repsfs_lag                # short-horizon EPS-forecast revision
+    - repsfl_lag                # long-horizon EPS-forecast revision
+    - reps1_lag                 # 1-period EPS revision (sparse, earnings-day)
+    - reps41_lag                # 4-1 EPS revision (sparse)
+    - repsf4_lag                # forward-4 EPS revision (sparse)
+    - sue_lag                   # standardised unexpected earnings (sparse, earnings-day)
+    - inesp_lag                 # fraction of estimates revised up
+    - inesn_lag                 # fraction of estimates revised down
+    - nspc5_lag                 # estimate-dispersion / count proxy
+    - days_since_earn           # post-earnings-drift clock (sessions since last report)
+    - dsi                       # short interest (shared; directional crowding)
+    - ddtcn                     # change in days-to-cover
+  sleeve_combine: ic_weighted   # ic_weighted | equal | reversal_only (combine reversal + flow ranks)
+  edge_calib_buckets: 25        # buckets for the walk-forward score -> E[excess bps] calibration
 
 portfolio:
   commission_bps_per_leg: 0.5   # Section 6.3
   slippage_bps_per_leg: 1.5     # Section 6.3
-  headline_quantile: 0.02       # top/bottom fraction (justified by the concentration sweep)
-  headline_weighting: equal     # equal | invvol | score
-  headline_score: score_ens     # score_ens | score_hgb | score_ridge
+  # HEADLINE: the disciplined, robust choice. The construction lab (tools/experiment*.py) showed tail
+  # concentration is the only lever that lifts NET Sharpe; the sophisticated overlays (flow blend,
+  # cost-aware/per-name selection, sector neutralization, vol-target, edge-gating) do not beat it. We keep
+  # the principled ridge+HGB ensemble (not the single best-cell model) at the broad concentration optimum.
+  headline_quantile: 0.0125     # top/bottom 1.25% (peak of a broad, stable concentration sweep)
+  headline_weighting: equal     # equal | invvol | score (equal-weight beats inverse-vol at the tails)
+  headline_score: score_ens     # score_ens (reversal ensemble) | score_hgb | score_combined | score_flow
   htb_exclude: true             # exclude Tier-C names from the short leg
-  gate_q: 0.0                   # cost-aware dispersion gate quantile (0 = no gate)
+  gate_q: 0.0                   # legacy dispersion gate quantile (0 = no gate)
   benchmark_aum: 250000000.0    # AUM for the QuantStats tear-sheet
   min_basket_names: 4           # minimum names per side to trade a day
-  concentration_sweep: [0.10, 0.05, 0.03, 0.02]
+  concentration_sweep: [0.02, 0.015, 0.0125, 0.01, 0.0075, 0.005]
   weighting_grid: [equal, invvol]
   stress_windows:
     "2018 Q4 selloff": ["2018-10-01", "2018-12-31"]
     "2020 Q1 COVID crash": ["2020-02-19", "2020-03-31"]
     "Full-year 2022 bear": ["2022-01-01", "2022-12-31"]
+  # --- v2 construction levers (all default OFF: the lab showed each fails to beat concentration; they are
+  #     still exercised in the ablation/Sharpe-ladder so the report can document the negative results) ---
+  selection_mode: quantile      # quantile | cost_aware  (cost is on GROSS, so per-name selection cannot cut it)
+  cost_buffer_c: 1.0            # per-side cost-aware bar = c * round_trip_bps (4 bps), when cost_aware is on
+  min_edge_names: 5             # min names per side under cost-aware mode
+  neutralize_sector: false      # ablation overlay (hurt: strips real sector-level overnight edge)
+  neutralize_beta: false        # ablation overlay (brief deems beta-neutrality out-of-scope-small)
+  beta_lookback: 60
+  vol_target_enabled: false     # ablation overlay (hurt at the tails)
+  vol_target_ann: 0.06
+  vol_target_lookback: 42
+  vol_target_clip: [0.5, 2.0]
+  # --- aggressive FRONTIER (higher-overfit-risk; reported alongside, not the headline): the single best
+  #     model x concentration cell (pure non-linear HGB at the tighter 1% tail). ---
+  frontier:
+    headline_score: score_hgb
+    headline_quantile: 0.01
+    selection_mode: quantile
+    headline_weighting: equal
+    neutralize_sector: false
+    neutralize_beta: false
+    vol_target_enabled: false
