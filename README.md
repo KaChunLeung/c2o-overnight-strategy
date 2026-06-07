@@ -74,5 +74,3 @@ docs/          worklog (course-provided PDFs are gitignored — not redistribute
 > Note: the provided dataset, the course brief, and exploratory notebooks are intentionally excluded from
 > this repository (third-party/teaching materials and embedded data). The `src/c2o` package + `config/` are
 > the canonical, reproducible deliverable; point it at your own `data/inputs/`.
-
-See [AGENTS.md](AGENTS.md) for conventions, gotchas, and the verification command.
