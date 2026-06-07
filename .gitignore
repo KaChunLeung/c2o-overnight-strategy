@@ -22,3 +22,7 @@ _*.html
 # loose logs
 _*.log
 *.log
+
+# course-provided materials & data-bearing notebooks (not for redistribution)
+docs/*.pdf
+*.ipynb

@@ -23,7 +23,7 @@ Things a new contributor (human or AI) cannot infer from the code alone. Keep it
 
 ## Gotchas
 - **Memory:** the full run holds the 8M-row price panel plus ~3M-row feature panels (~6–8 GB peak). `main()`
-  frees `panel.prices`/`panel.panel` after Step 2. Do not run the monolithic notebook headless on a low-RAM box.
+  frees `panel.prices`/`panel.panel` after Step 2.
 - **Python 3.14** is the tested interpreter (`.python-version`). `quantstats` works but emits deprecation
   warnings; they are filtered, not suppressed at the cause (it is a third-party issue).
 - **Inputs are large and gitignored** (`data/inputs/*.parquet`, ~1 GB). See `data/inputs/README.md` for
@@ -35,4 +35,4 @@ Things a new contributor (human or AI) cannot infer from the code alone. Keep it
 - All paths and behaviour-bearing numbers live in `config/*.yaml`; code carries no path or magic-number literals.
 - `io.py` is the only module that touches the filesystem. Steps are pure functions with typed handoffs.
 - Fixed seed (`run.seed`). Outputs are per-run under `data/outputs/<run_id>/` and safe to delete.
-- Coding rules: `docs/coding_architecture_guidelines.pdf`.
+- Coding rules: the course coding-architecture guidelines (handout; not redistributed in this repo).

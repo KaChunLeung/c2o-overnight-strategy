@@ -65,11 +65,14 @@ config/        default.yaml (all params), fast.yaml (smoke overrides)
 src/c2o/       config, io, panel, capacity, borrow, alpha, portfolio, metrics, reporting, main, dl_alpha
 tests/         26 unit tests + one slow integration smoke
 tools/         experiment*.py — dev construction lab (not part of the shipped pipeline)
-data/inputs/   read-only source parquets (gitignored)
+data/inputs/   read-only source parquets (gitignored — not redistributed)
 data/outputs/  per-run deliverables (gitignored)
-notebooks/     exploratory companion (full Steps 1-5 narrative)
 report/        C2O_report.tex (the investigation), innovation_declaration.md, figures/
-docs/          brief, coding guidelines, worklog
+docs/          worklog (course-provided PDFs are gitignored — not redistributed)
 ```
+
+> Note: the provided dataset, the course brief, and exploratory notebooks are intentionally excluded from
+> this repository (third-party/teaching materials and embedded data). The `src/c2o` package + `config/` are
+> the canonical, reproducible deliverable; point it at your own `data/inputs/`.
 
 See [AGENTS.md](AGENTS.md) for conventions, gotchas, and the verification command.

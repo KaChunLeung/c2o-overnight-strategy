@@ -11,9 +11,10 @@ once the mandated frictions are applied.
 **Update — refactored into a guideline-compliant package.** The work was subsequently ported from the
 notebook into an installable `src/c2o/` package with a single entry point (`python -m c2o.main`), a typed
 config (`config/default.yaml`), an `io.py` filesystem boundary, unit tests (`pytest`, 26 tests < 5 s) and a
-slow integration smoke. The **package is now the canonical, reproducible deliverable**; the notebook
-(`notebooks/C2O_Steps1to5_Complete.ipynb`) remains the exploratory companion with the full narrative. See
-`README.md` and `AGENTS.md`. The full report is `report/C2O_report.tex`.
+slow integration smoke. The **package is now the canonical, reproducible deliverable**. (The exploratory
+Jupyter notebooks used during development are kept out of the public repository because they embed values
+derived from the provided dataset; the package + report fully supersede them.) See `README.md` and `AGENTS.md`.
+The full report is `report/C2O_report.tex`.
 
 ---
 
