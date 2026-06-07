@@ -1,5 +1,15 @@
-# data, outputs, logs are never in git (the recipe is, not the ingredients)
-data/
+# data is excluded by default (provided dataset + caches are NOT redistributed); only selected DERIVED
+# outputs are force-included below (aggregate metrics, figures, the strategy's own tear-sheet -- no raw data).
+data/inputs/
+data/*
+!data/outputs/
+data/outputs/*
+!data/outputs/20260606_173124/
+!data/outputs/20260607_131054/
+!data/intermediary/
+data/intermediary/*
+!data/intermediary/exp_results.csv
+!data/intermediary/exp2_results.csv
 logs/
 .venv/
 __pycache__/

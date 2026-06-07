@@ -1,0 +1,312 @@
+{
+  "run_dir": "20260607_131054",
+  "timestamp": "2026-06-07T13:15:08",
+  "hostname": "leungdanielpc",
+  "python": "3.14.0",
+  "git_sha": "8b24bc2b0fa1e9f934c1386849a2454b619ba2d5",
+  "config": {
+    "run": {
+      "seed": 7,
+      "fast": false,
+      "fast_eval_years": [
+        2023,
+        2024
+      ]
+    },
+    "paths": {
+      "inputs_dir": "data/inputs",
+      "intermediary_dir": "data/intermediary",
+      "outputs_dir": "data/outputs",
+      "files": {
+        "prices": "prices.parquet",
+        "earnings_calendar": "earnings_calendar.parquet",
+        "earnings_transfo": "earnings_transfo.parquet",
+        "short_interest": "short_interest_transfo.parquet",
+        "cheapness": "cheapness_scores.parquet",
+        "gics": "gics_info.parquet",
+        "regime": "regime.parquet",
+        "sp500_tr": "sp500_tr.parquet"
+      }
+    },
+    "window": {
+      "start_date": "2010-01-01",
+      "cutoff": "2024-12-31",
+      "universe_size": 1000,
+      "min_history_days": 365,
+      "residual_tolerance": 1e-08
+    },
+    "capacity": {
+      "aum_levels": [
+        50000000.0,
+        250000000.0,
+        1000000000.0
+      ],
+      "planning_basket_names": 200,
+      "participation_cap": 0.05,
+      "impact_k": 0.7,
+      "price_floor": 5.0,
+      "mcap_floor": 2000000000.0,
+      "vol_min_ann": 0.05,
+      "vol_max_ann": 1.2,
+      "rolling_window": 20,
+      "earn_window_after": 1
+    },
+    "borrow": {
+      "trading_days_per_year": 252,
+      "annual_rates": {
+        "A": 0.004,
+        "B": 0.02,
+        "C": 0.08
+      },
+      "dsi_moderate": 0.1,
+      "dsi_high": 0.2,
+      "dtcn_moderate": 7.5,
+      "dtcn_high": 12.5,
+      "ddtcn_moderate": 2.0,
+      "ddtcn_high": 5.0,
+      "moderate_pct": 0.9,
+      "high_pct": 0.98,
+      "small_mcap_for_htb": 10000000000.0,
+      "low_adv_for_htb": 25000000.0,
+      "stress_score_moderate": 2,
+      "stress_score_high": 4,
+      "hard_exclude_tier": "C"
+    },
+    "alpha": {
+      "signal_aum": 50000000.0,
+      "first_eval_year": 2015,
+      "last_eval_year": 2024,
+      "ridge_lambda": 25.0,
+      "min_daily_names": 80,
+      "min_train_obs": 50000,
+      "rolling_ic_window": 63,
+      "zscore_clip": 5.0,
+      "hgb_train_sample": 700000,
+      "hgb": {
+        "max_iter": 200,
+        "max_depth": 4,
+        "learning_rate": 0.05,
+        "l2_regularization": 1.0,
+        "min_samples_leaf": 200
+      },
+      "base_features": [
+        "r_on_today",
+        "r_on_lag1",
+        "r_on_5d_lag",
+        "r_id_lag1",
+        "r_cc_lag1",
+        "r_cc_5d_lag",
+        "r_cc_20d_lag",
+        "vol20_ann",
+        "log_adv20",
+        "log_ranking_mcap",
+        "roll_spread_bps",
+        "dsi",
+        "dtcn",
+        "ddtcn",
+        "borrow_stress_score",
+        "valuation_score_lag",
+        "quality_score_lag",
+        "health_score_lag",
+        "momentum_score_lag",
+        "score_velocity_lag",
+        "value_trap_lag"
+      ],
+      "new_features": [
+        "gap_z",
+        "range_lag1",
+        "amihud_lag1",
+        "vol_shock",
+        "r_cc_2d_lag"
+      ],
+      "flow_features": [
+        "deps_lag",
+        "epsf_lag",
+        "epsp_lag",
+        "repsfs_lag",
+        "repsfl_lag",
+        "reps1_lag",
+        "reps41_lag",
+        "repsf4_lag",
+        "sue_lag",
+        "inesp_lag",
+        "inesn_lag",
+        "nspc5_lag",
+        "days_since_earn",
+        "dsi",
+        "ddtcn"
+      ],
+      "sleeve_combine": "ic_weighted",
+      "edge_calib_buckets": 25
+    },
+    "portfolio": {
+      "commission_bps_per_leg": 0.5,
+      "slippage_bps_per_leg": 1.5,
+      "headline_quantile": 0.0125,
+      "headline_weighting": "equal",
+      "headline_score": "score_ens",
+      "htb_exclude": true,
+      "gate_q": 0.0,
+      "benchmark_aum": 250000000.0,
+      "min_basket_names": 4,
+      "concentration_sweep": [
+        0.02,
+        0.015,
+        0.0125,
+        0.01,
+        0.0075,
+        0.005
+      ],
+      "weighting_grid": [
+        "equal",
+        "invvol"
+      ],
+      "stress_windows": {
+        "2018 Q4 selloff": [
+          "2018-10-01",
+          "2018-12-31"
+        ],
+        "2020 Q1 COVID crash": [
+          "2020-02-19",
+          "2020-03-31"
+        ],
+        "Full-year 2022 bear": [
+          "2022-01-01",
+          "2022-12-31"
+        ]
+      },
+      "selection_mode": "quantile",
+      "cost_buffer_c": 1.0,
+      "min_edge_names": 5,
+      "neutralize_sector": false,
+      "neutralize_beta": false,
+      "beta_lookback": 60,
+      "vol_target_enabled": false,
+      "vol_target_ann": 0.06,
+      "vol_target_lookback": 42,
+      "vol_target_clip": [
+        0.5,
+        2.0
+      ],
+      "frontier": {
+        "headline_score": "score_hgb",
+        "headline_quantile": 0.01,
+        "selection_mode": "quantile",
+        "headline_weighting": "equal",
+        "neutralize_sector": false,
+        "neutralize_beta": false,
+        "vol_target_enabled": false
+      }
+    }
+  },
+  "net_sharpe_250M": 0.7086940461470815,
+  "gross_sharpe_250M": 1.80656019611776,
+  "frontier_sharpe_250M": 0.8044911592604471,
+  "tearsheet_written": true,
+  "headline": [
+    {
+      "AUM": "50M",
+      "net_ann_ret": 0.02025255486099311,
+      "net_ann_vol": 0.06399186405617506,
+      "net_sharpe": 0.31648640275917683,
+      "gross_sharpe": 1.5973434546448197,
+      "max_drawdown": -0.12028671987987893,
+      "daily_turnover": 0.7892545935336649,
+      "avg_gross_util": 0.7892545935336649,
+      "frac_days_full_gross": 0.5067675159235668,
+      "frac_days_traded": 0.9988071570576541,
+      "avg_max_pos_pct_adv": 0.04996864052611813,
+      "comm_bps": 0.7892545935336648,
+      "slip_bps": 2.3677637806009955,
+      "borrow_bps": 0.10123749867090306,
+      "avg_names_per_side": 10.952627388535031
+    },
+    {
+      "AUM": "250M",
+      "net_ann_ret": 0.02945863381282676,
+      "net_ann_vol": 0.04156749160372225,
+      "net_sharpe": 0.7086940461470815,
+      "gross_sharpe": 1.80656019611776,
+      "max_drawdown": -0.04957269827456434,
+      "daily_turnover": 0.4434805472216794,
+      "avg_gross_util": 0.4434805472216794,
+      "frac_days_full_gross": 0.08837579617834394,
+      "frac_days_traded": 0.9988071570576541,
+      "avg_max_pos_pct_adv": 0.04999999977336876,
+      "comm_bps": 0.44348054722167957,
+      "slip_bps": 1.3304416416650384,
+      "borrow_bps": 0.04870294236391099,
+      "avg_names_per_side": 9.535429936305732
+    },
+    {
+      "AUM": "1000M",
+      "net_ann_ret": 0.009040340733361348,
+      "net_ann_vol": 0.015587629665123984,
+      "net_sharpe": 0.5799689194302808,
+      "gross_sharpe": 1.42731381095363,
+      "max_drawdown": -0.01832231434392373,
+      "daily_turnover": 0.1424053065729343,
+      "avg_gross_util": 0.14240530657293426,
+      "frac_days_full_gross": 0.005719313682358117,
+      "frac_days_traded": 0.9037773359840954,
+      "avg_max_pos_pct_adv": 0.049999999856930454,
+      "comm_bps": 0.14240530657293432,
+      "slip_bps": 0.4272159197188028,
+      "borrow_bps": 0.014102193217509058,
+      "avg_names_per_side": 5.53145622525297
+    }
+  ],
+  "frontier": [
+    {
+      "AUM": "50M",
+      "net_ann_ret": 0.04945727391625155,
+      "net_ann_vol": 0.06688505610956588,
+      "net_sharpe": 0.7394368307807726,
+      "gross_sharpe": 2.095053553384512,
+      "max_drawdown": -0.11757831509023353,
+      "daily_turnover": 0.880069065116054,
+      "avg_gross_util": 0.880069065116054,
+      "frac_days_full_gross": 0.7414829659318637,
+      "frac_days_traded": 0.9920477137176938,
+      "avg_max_pos_pct_adv": 0.049485481738956394,
+      "comm_bps": 0.880069065116054,
+      "slip_bps": 2.6402071953481623,
+      "borrow_bps": 0.10900585274602377,
+      "avg_names_per_side": 8.725851703406814
+    },
+    {
+      "AUM": "250M",
+      "net_ann_ret": 0.04967298801866562,
+      "net_ann_vol": 0.061744603961004396,
+      "net_sharpe": 0.8044911592604471,
+      "gross_sharpe": 1.9025389510025634,
+      "max_drawdown": -0.0930786205641746,
+      "daily_turnover": 0.6715984579494138,
+      "avg_gross_util": 0.6715984579494138,
+      "frac_days_full_gross": 0.40048740861088544,
+      "frac_days_traded": 0.9789264413518887,
+      "avg_max_pos_pct_adv": 0.04999999982794443,
+      "comm_bps": 0.6715984579494138,
+      "slip_bps": 2.0147953738482416,
+      "borrow_bps": 0.07097601141224796,
+      "avg_names_per_side": 7.680138099106417
+    },
+    {
+      "AUM": "1000M",
+      "net_ann_ret": 0.0018431014771323419,
+      "net_ann_vol": 0.037742984094373426,
+      "net_sharpe": 0.04883295588191461,
+      "gross_sharpe": 0.588275577383638,
+      "max_drawdown": -0.10026700219771167,
+      "daily_turnover": 0.3397765151448414,
+      "avg_gross_util": 0.3397765151448414,
+      "frac_days_full_gross": 0.09945130315500686,
+      "frac_days_traded": 0.5797216699801193,
+      "avg_max_pos_pct_adv": 0.04999999992963131,
+      "comm_bps": 0.33977651514484153,
+      "slip_bps": 1.0193295454345244,
+      "borrow_bps": 0.0333431024287754,
+      "avg_names_per_side": 4.906035665294924
+    }
+  ]
+}

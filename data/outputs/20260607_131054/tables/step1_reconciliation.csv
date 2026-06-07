@@ -1,0 +1,2 @@
+valid_stock_days,failed_stock_days,failed_fraction,max_abs_residual,tolerance
+7881623,0,0.0,4.440892098500626e-16,1e-08
