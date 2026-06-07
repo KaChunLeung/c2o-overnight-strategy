@@ -36,3 +36,8 @@ _*.log
 # course-provided materials & data-bearing notebooks (not for redistribution)
 docs/*.pdf
 *.ipynb
+
+# root-level duplicates of report/ files (kept in working dir for Overleaf, not tracked)
+/C2O_report.tex
+/innovation_declaration.md
+/quantstat_tearsheet_250M.html
